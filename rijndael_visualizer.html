@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rijndael / AES Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --panel: #0f1628;
+    --border: #1e2d4a;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff6b;
+    --accent4: #ffd700;
+    --text: #c8d8f0;
+    --dim: #4a6080;
+    --subbytes: #1a3a5c;
+    --subbytes-h: #00d4ff;
+    --shiftrows: #2a1a3c;
+    --shiftrows-h: #c084fc;
+    --mixcols: #1a2a1a;
+    --mixcols-h: #7fff6b;
+    --addrk: #2a1a0a;
+    --addrk-h: #ff6b35;
+    --initial: #1a2a2a;
+    --initial-h: #ffd700;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  header h1 {
+    font-size: 2.8rem;
+    font-weight: 700;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--accent), #7fff6b, var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 20px rgba(0,212,255,0.4));
+  }
+
+  header p {
+    margin-top: 6px;
+    color: var(--dim);
+    font-size: 1rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* Input Section */
+  .input-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .input-group label {
+    display: block;
+    font-size: 0.75rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .input-group input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--accent3);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    padding: 10px 14px;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  .input-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,212,255,0.1);
+  }
+
+  .input-group .hint {
+    font-size: 0.72rem;
+    color: var(--dim);
+    margin-top: 5px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .btn-row {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover { background: #33ddff; transform: translateY(-1px); }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-nav {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    min-width: 120px;
+  }
+  .btn-nav:hover { background: rgba(0,212,255,0.1); }
+  .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  /* Progress bar */
+  .progress-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .step-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-family: 'Share Tech Mono', monospace;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    color: var(--dim);
+  }
+
+  .step-dot.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px rgba(0,212,255,0.4); }
+  .step-dot.done { border-color: var(--accent3); color: var(--accent3); background: rgba(127,255,107,0.05); }
+
+  .step-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    min-width: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Main stage */
+  .stage {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 20px;
+    min-height: 360px;
+  }
+
+  .stage-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .stage-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  .stage-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .stage-desc {
+    font-size: 0.9rem;
+    color: var(--dim);
+    line-height: 1.6;
+    margin-bottom: 24px;
+    font-family: 'Share Tech Mono', monospace;
+    border-left: 2px solid var(--border);
+    padding-left: 12px;
+  }
+
+  /* Matrix display */
+  .matrices-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .matrix-wrap {
+    text-align: center;
+  }
+
+  .matrix-label {
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 8px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(4, 52px);
+    gap: 3px;
+  }
+
+  .cell {
+    width: 52px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    font-weight: bold;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.3s;
+    text-transform: uppercase;
+  }
+
+  .cell.highlight {
+    animation: cellpop 0.4s ease;
+  }
+
+  @keyframes cellpop {
+    0% { transform: scale(0.8); opacity: 0.3; }
+    60% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .op-symbol {
+    font-size: 2rem;
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* Color themes per step */
+  .theme-initial .cell { background: var(--initial); color: var(--initial-h); }
+  .theme-subbytes .cell { background: var(--subbytes); color: var(--subbytes-h); }
+  .theme-shiftrows .cell { background: var(--shiftrows); color: #c084fc; }
+  .theme-shiftrows .cell.shifted-1 { border-color: #c084fc; }
+  .theme-shiftrows .cell.shifted-2 { border-color: #a855f7; }
+  .theme-shiftrows .cell.shifted-3 { border-color: #7c3aed; }
+  .theme-mixcols .cell { background: var(--mixcols); color: var(--mixcols-h); }
+  .theme-addrk .cell { background: var(--addrk); color: var(--addrk-h); }
+  .theme-key .cell { background: #1a1a2e; color: var(--accent4); }
+  .theme-output .cell { background: #1a2a1a; color: #00ff88; }
+
+  /* Navigation */
+  .nav-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .step-counter {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--dim);
+  }
+
+  /* Explanation box */
+  .explanation {
+    background: rgba(0,212,255,0.04);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 20px;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .explanation strong {
+    color: var(--accent);
+  }
+
+  /* Key schedule special display */
+  .keyschedule-grid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .rkey-col {
+    text-align: center;
+  }
+
+  .rkey-col .matrix-label {
+    font-size: 0.62rem;
+  }
+
+  .rkey-col .matrix {
+    grid-template-columns: repeat(4, 36px);
+    gap: 2px;
+  }
+
+  .rkey-col .cell {
+    width: 36px;
+    height: 30px;
+    font-size: 0.72rem;
+  }
+
+  /* Error */
+  .error {
+    color: #ff4444;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 8px;
+  }
+
+  /* Welcome screen */
+  .welcome {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .welcome .icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 0 12px rgba(0,212,255,0.5));
+  }
+
+  .welcome p { line-height: 1.8; font-size: 0.9rem; }
+
+  /* Output box */
+  .output-box {
+    background: var(--bg);
+    border: 1px solid var(--accent3);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 20px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .output-box .out-label {
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    color: var(--accent3);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .output-box .out-value {
+    font-size: 1.1rem;
+    color: #00ff88;
+    word-break: break-all;
+    letter-spacing: 2px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.8rem; }
+    .input-section { grid-template-columns: 1fr; }
+    .cell { width: 40px; height: 36px; font-size: 0.82rem; }
+    .matrix { grid-template-columns: repeat(4, 40px); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Rijndael / AES</h1>
+    <p>Step-by-Step Encryption Visualizer</p>
+  </header>
+
+  <div class="input-section">
+    <div class="input-group">
+      <label>Plaintext (16 karakter)</label>
+      <input type="text" id="inp-plain" maxlength="16" value="pqtkruuraami n p" placeholder="Masukkan 16 karakter...">
+      <div class="hint">Tepat 16 karakter (128-bit)</div>
+    </div>
+    <div class="input-group">
+      <label>Key (16 karakter)</label>
+      <input type="text" id="inp-key" maxlength="16" value="aeRSN mydFAARinh" placeholder="Masukkan 16 karakter...">
+      <div class="hint">Tepat 16 karakter (128-bit)</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="startEncrypt()">▶ Mulai Enkripsi</button>
+      <button class="btn-secondary" onclick="loadExample()">Contoh dari PDF</button>
+      <button class="btn-secondary" onclick="resetAll()">↺ Reset</button>
+    </div>
+    <div id="input-error" class="error" style="display:none;grid-column:1/-1;"></div>
+  </div>
+
+  <div id="progress-wrap" style="display:none">
+    <div class="progress-bar" id="progress-bar"></div>
+    <div class="stage" id="stage"></div>
+    <div class="nav-row">
+      <button class="btn-nav" id="btn-prev" onclick="navigate(-1)">◀ Sebelumnya</button>
+      <span class="step-counter" id="step-counter"></span>
+      <button class="btn-nav" id="btn-next" onclick="navigate(1)">Selanjutnya ▶</button>
+    </div>
+  </div>
+
+  <div id="welcome-wrap">
+    <div class="welcome">
+      <div class="icon">🔐</div>
+      <p>Masukkan <strong style="color:var(--accent)">plaintext</strong> dan <strong style="color:var(--accent4)">key</strong> di atas,<br>
+      lalu klik <strong style="color:var(--accent3)">Mulai Enkripsi</strong> untuk melihat setiap langkah Rijndael secara detail.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== AES CORE ====================
+const SBOX = [
+  0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
+  0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
+  0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,
+  0x04,0xc7,0x23,0xc3,0x18,0x96,0x05,0x9a,0x07,0x12,0x80,0xe2,0xeb,0x27,0xb2,0x75,
+  0x09,0x83,0x2c,0x1a,0x1b,0x6e,0x5a,0xa0,0x52,0x3b,0xd6,0xb3,0x29,0xe3,0x2f,0x84,
+  0x53,0xd1,0x00,0xed,0x20,0xfc,0xb1,0x5b,0x6a,0xcb,0xbe,0x39,0x4a,0x4c,0x58,0xcf,
+  0xd0,0xef,0xaa,0xfb,0x43,0x4d,0x33,0x85,0x45,0xf9,0x02,0x7f,0x50,0x3c,0x9f,0xa8,
+  0x51,0xa3,0x40,0x8f,0x92,0x9d,0x38,0xf5,0xbc,0xb6,0xda,0x21,0x10,0xff,0xf3,0xd2,
+  0xcd,0x0c,0x13,0xec,0x5f,0x97,0x44,0x17,0xc4,0xa7,0x7e,0x3d,0x64,0x5d,0x19,0x73,
+  0x60,0x81,0x4f,0xdc,0x22,0x2a,0x90,0x88,0x46,0xee,0xb8,0x14,0xde,0x5e,0x0b,0xdb,
+  0xe0,0x32,0x3a,0x0a,0x49,0x06,0x24,0x5c,0xc2,0xd3,0xac,0x62,0x91,0x95,0xe4,0x79,
+  0xe7,0xc8,0x37,0x6d,0x8d,0xd5,0x4e,0xa9,0x6c,0x56,0xf4,0xea,0x65,0x7a,0xae,0x08,
+  0xba,0x78,0x25,0x2e,0x1c,0xa6,0xb4,0xc6,0xe8,0xdd,0x74,0x1f,0x4b,0xbd,0x8b,0x8a,
+  0x70,0x3e,0xb5,0x66,0x48,0x03,0xf6,0x0e,0x61,0x35,0x57,0xb9,0x86,0xc1,0x1d,0x9e,
+  0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,
+  0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16
+];
+
+const RCON = [0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36];
+
+function xtime(a) {
+  return ((a << 1) ^ ((a & 0x80) ? 0x1b : 0)) & 0xff;
+}
+
+function gmul(a, b) {
+  let p = 0;
+  for (let i = 0; i < 8; i++) {
+    if (b & 1) p ^= a;
+    const hi = a & 0x80;
+    a = (a << 1) & 0xff;
+    if (hi) a ^= 0x1b;
+    b >>= 1;
+  }
+  return p;
+}
+
+function strToBytes(s) {
+  return Array.from(s).map(c => c.charCodeAt(0));
+}
+
+function bytesToState(b) {
+  // Column-major order
+  let s = Array.from({length:4}, () => new Array(4).fill(0));
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 4; c++)
+      s[r][c] = b[r + 4*c];
+  return s;
+}
+
+function stateToBytes(s) {
+  let b = [];
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++)
+      b.push(s[r][c]);
+  return b;
+}
+
+function copyState(s) {
+  return s.map(r => [...r]);
+}
+
+function h(v) {
+  return v.toString(16).padStart(2,'0');
+}
+
+// Key Expansion
+function keyExpansion(keyBytes) {
+  let w = [];
+  for (let i = 0; i < 4; i++)
+    w.push(keyBytes.slice(i*4, i*4+4));
+  for (let i = 4; i < 44; i++) {
+    let temp = [...w[i-1]];
+    if (i % 4 === 0) {
+      temp = [temp[1], temp[2], temp[3], temp[0]].map(b => SBOX[b]);
+      temp[0] ^= RCON[i/4 - 1];
+    }
+    w.push(w[i-4].map((b,j) => b ^ temp[j]));
+  }
+  let roundKeys = [];
+  for (let r = 0; r <= 10; r++) {
+    let rk = Array.from({length:4}, () => new Array(4).fill(0));
+    for (let c = 0; c < 4; c++)
+      for (let row = 0; row < 4; row++)
+        rk[row][c] = w[r*4+c][row];
+    roundKeys.push(rk);
+  }
+  return roundKeys;
+}
+
+function addRoundKey(state, rk) {
+  let s = copyState(state);
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 4; c++)
+      s[r][c] ^= rk[r][c];
+  return s;
+}
+
+function subBytes(state) {
+  return state.map(row => row.map(b => SBOX[b]));
+}
+
+function shiftRows(state) {
+  let s = copyState(state);
+  for (let r = 1; r < 4; r++) {
+    let row = [...s[r]];
+    for (let c = 0; c < 4; c++)
+      s[r][c] = row[(c + r) % 4];
+  }
+  return s;
+}
+
+function mixColumns(state) {
+  let s = copyState(state);
+  for (let c = 0; c < 4; c++) {
+    let a = state.map(r => r[c]);
+    s[0][c] = gmul(2,a[0]) ^ gmul(3,a[1]) ^ a[2] ^ a[3];
+    s[1][c] = a[0] ^ gmul(2,a[1]) ^ gmul(3,a[2]) ^ a[3];
+    s[2][c] = a[0] ^ a[1] ^ gmul(2,a[2]) ^ gmul(3,a[3]);
+    s[3][c] = gmul(3,a[0]) ^ a[1] ^ a[2] ^ gmul(2,a[3]);
+  }
+  return s;
+}
+
+// ==================== STEP GENERATOR ====================
+function generateSteps(plain16, key16) {
+  const plainBytes = strToBytes(plain16);
+  const keyBytes = strToBytes(key16);
+  const roundKeys = keyExpansion(keyBytes);
+  const steps = [];
+
+  // Step 0: Input
+  let state = bytesToState(plainBytes);
+  const keyState = bytesToState(keyBytes);
+  steps.push({
+    type: 'input',
+    title: 'Input',
+    badge: 'AWAL',
+    badgeColor: '#ffd700',
+    desc: 'Plaintext dikonversi ke matriks state 4×4 (column-major). Key juga dikonversi ke matriks 4×4. Keduanya akan di-XOR pada langkah AddRoundKey awal.',
+    matrices: [
+      { label: 'State (Plaintext)', data: state, theme: 'theme-initial' },
+      { label: 'Cipher Key', data: keyState, theme: 'theme-key' },
+    ],
+    explanation: `<strong>Konversi:</strong> Setiap karakter plaintext diubah ke nilai heksadesimal ASCII, lalu disusun dalam matriks 4×4 secara kolom (column-major order).<br><br>Plaintext: <strong>${plain16}</strong><br>Key: <strong>${key16}</strong>`
+  });
+
+  // Step 1: Initial AddRoundKey
+  let afterARK0 = addRoundKey(state, roundKeys[0]);
+  steps.push({
+    type: 'addroundkey',
+    title: 'AddRoundKey (Awal)',
+    badge: 'ROUND 0',
+    badgeColor: '#ff6b35',
+    desc: 'State di-XOR dengan Round Key 0 (cipher key awal). Ini adalah langkah pra-ronde sebelum 10 ronde utama dimulai.',
+    matrices: [
+      { label: 'State', data: state, theme: 'theme-initial' },
+      { label: 'XOR', data: null, symbol: '⊕' },
+      { label: 'Round Key 0', data: roundKeys[0], theme: 'theme-key' },
+      { label: 'Hasil', data: afterARK0, theme: 'theme-addrk' },
+    ],
+    explanation: `<strong>AddRoundKey:</strong> Setiap byte pada state di-XOR (⊕) dengan byte yang bersesuaian pada round key.<br><br>Contoh sel [0][0]: <strong>${h(state[0][0])} ⊕ ${h(roundKeys[0][0][0])} = ${h(afterARK0[0][0])}</strong>`
+  });
+
+  state = afterARK0;
+
+  // Rounds 1-10
+  for (let round = 1; round <= 10; round++) {
+    const isLast = round === 10;
+
+    // SubBytes
+    const afterSB = subBytes(state);
+    steps.push({
+      type: 'subbytes',
+      title: `SubBytes`,
+      badge: `ROUND ${round}`,
+      badgeColor: '#00d4ff',
+      desc: `Setiap byte pada state digantikan menggunakan S-Box (tabel substitusi 16×16). Proses ini memberikan sifat confusion (non-linearitas) pada enkripsi.`,
+      matrices: [
+        { label: 'Sebelum SubBytes', data: state, theme: 'theme-initial' },
+        { label: 'Setelah SubBytes', data: afterSB, theme: 'theme-subbytes' },
+      ],
+      explanation: `<strong>SubBytes:</strong> Setiap byte b digantikan dengan SBOX[b].<br>Contoh: <strong>${h(state[0][0])} → SBOX[${h(state[0][0])}] = ${h(afterSB[0][0])}</strong><br><br>S-Box dirancang untuk menghilangkan hubungan linear antara input dan output (confusion).`
+    });
+
+    // ShiftRows
+    const afterSR = shiftRows(afterSB);
+    steps.push({
+      type: 'shiftrows',
+      title: `ShiftRows`,
+      badge: `ROUND ${round}`,
+      badgeColor: '#c084fc',
+      desc: `Baris-baris state digeser secara sirkular ke kiri: Baris 0 tidak digeser, Baris 1 geser 1, Baris 2 geser 2, Baris 3 geser 3.`,
+      matrices: [
+        { label: 'Sebelum ShiftRows', data: afterSB, theme: 'theme-subbytes', shiftHighlight: false },
+        { label: 'Setelah ShiftRows', data: afterSR, theme: 'theme-shiftrows', shiftHighlight: true },
+      ],
+      explanation: `<strong>ShiftRows:</strong> Geser siklik tiap baris ke kiri sebanyak indeks barisnya.<br><br>• Baris 0: [${afterSB[0].map(h).join(', ')}] → tidak berubah<br>• Baris 1: geser 1 → [${afterSR[1].map(h).join(', ')}]<br>• Baris 2: geser 2 → [${afterSR[2].map(h).join(', ')}]<br>• Baris 3: geser 3 → [${afterSR[3].map(h).join(', ')}]<br><br>Ini menyebarkan byte antar kolom (diffusion).`
+    });
+
+    if (!isLast) {
+      // MixColumns
+      const afterMC = mixColumns(afterSR);
+      steps.push({
+        type: 'mixcols',
+        title: `MixColumns`,
+        badge: `ROUND ${round}`,
+        badgeColor: '#7fff6b',
+        desc: `Setiap kolom state dikalikan dengan matriks tetap dalam Galois Field GF(2⁸). Operasi ini memberikan diffusion yang kuat (setiap output byte bergantung pada 4 input byte).`,
+        matrices: [
+          { label: 'Sebelum MixColumns', data: afterSR, theme: 'theme-shiftrows' },
+          { label: 'Setelah MixColumns', data: afterMC, theme: 'theme-mixcols' },
+        ],
+        explanation: `<strong>MixColumns:</strong> Setiap kolom dikalikan matriks:<br>[2,3,1,1 / 1,2,3,1 / 1,1,2,3 / 3,1,1,2]<br>dalam GF(2⁸) dengan polynomial x⁸+x⁴+x³+x+1.<br><br>Contoh kolom 0: byte pertama = 2·${h(afterSR[0][0])} ⊕ 3·${h(afterSR[1][0])} ⊕ ${h(afterSR[2][0])} ⊕ ${h(afterSR[3][0])} = <strong>${h(afterMC[0][0])}</strong>`
+      });
+
+      // AddRoundKey
+      const afterARK = addRoundKey(afterMC, roundKeys[round]);
+      steps.push({
+        type: 'addroundkey',
+        title: `AddRoundKey`,
+        badge: `ROUND ${round}`,
+        badgeColor: '#ff6b35',
+        desc: `State di-XOR dengan round key ke-${round} yang dihasilkan dari Key Schedule. Ini adalah langkah terakhir dalam satu ronde.`,
+        matrices: [
+          { label: `Setelah MixColumns`, data: afterMC, theme: 'theme-mixcols' },
+          { label: 'XOR', data: null, symbol: '⊕' },
+          { label: `Round Key ${round}`, data: roundKeys[round], theme: 'theme-key' },
+          { label: 'Hasil Round ' + round, data: afterARK, theme: 'theme-addrk' },
+        ],
+        explanation: `<strong>AddRoundKey Round ${round}:</strong> State di-XOR dengan round key ${round}.<br>Contoh [0][0]: <strong>${h(afterMC[0][0])} ⊕ ${h(roundKeys[round][0][0])} = ${h(afterARK[0][0])}</strong>`
+      });
+
+      state = afterARK;
+    } else {
+      // Last round: AddRoundKey tanpa MixColumns
+      const afterARK = addRoundKey(afterSR, roundKeys[round]);
+      steps.push({
+        type: 'addroundkey',
+        title: `AddRoundKey (Ronde Terakhir)`,
+        badge: `ROUND ${round}`,
+        badgeColor: '#ff6b35',
+        desc: `Ronde terakhir TIDAK menggunakan MixColumns. Hanya SubBytes → ShiftRows → AddRoundKey. Ini menghasilkan ciphertext final.`,
+        matrices: [
+          { label: 'Setelah ShiftRows', data: afterSR, theme: 'theme-shiftrows' },
+          { label: 'XOR', data: null, symbol: '⊕' },
+          { label: `Round Key 10`, data: roundKeys[10], theme: 'theme-key' },
+          { label: 'Ciphertext!', data: afterARK, theme: 'theme-output' },
+        ],
+        explanation: `<strong>Ronde Terakhir (Round 10):</strong> Tidak ada MixColumns agar enkripsi dan dekripsi memiliki struktur yang simetris.<br><br>Hasil AddRoundKey terakhir adalah <strong>CIPHERTEXT FINAL</strong>.`
+      });
+      state = afterARK;
+    }
+  }
+
+  // Key Schedule overview
+  steps.push({
+    type: 'keyschedule',
+    title: 'Key Schedule',
+    badge: 'BONUS',
+    badgeColor: '#ffd700',
+    desc: 'Key Schedule menghasilkan 11 round keys dari cipher key awal menggunakan RotWord, SubBytes, dan XOR dengan Rcon.',
+    roundKeys: roundKeys,
+    explanation: `<strong>Key Schedule:</strong> Dari 1 cipher key (128-bit), dihasilkan 11 round keys (untuk round 0–10).<br><br>Untuk setiap 4 word baru:<br>• Jika posisi kelipatan 4: RotWord → SubBytes → XOR Rcon → XOR W[i-4]<br>• Selainnya: XOR W[i-1] dengan W[i-4]`
+  });
+
+  // Final output
+  const cipherBytes = stateToBytes(state);
+  const cipherHex = cipherBytes.map(h).join(' ');
+  steps.push({
+    type: 'output',
+    title: 'Output Ciphertext',
+    badge: 'SELESAI',
+    badgeColor: '#00ff88',
+    desc: 'Enkripsi Rijndael/AES-128 selesai! Plaintext telah dienkripsi menjadi ciphertext setelah 10 ronde.',
+    matrices: [
+      { label: 'Ciphertext (State)', data: state, theme: 'theme-output' }
+    ],
+    cipherHex,
+    plaintext: plain16,
+    explanation: `<strong>Enkripsi selesai!</strong><br><br>Plaintext: <strong>${plain16}</strong><br>Key: <strong>${key16}</strong><br>Ciphertext (hex): <strong>${cipherHex}</strong><br><br>Total: 1 AddRoundKey awal + 9 ronde penuh (SubBytes+ShiftRows+MixColumns+AddRoundKey) + 1 ronde terakhir (SubBytes+ShiftRows+AddRoundKey) = <strong>10 ronde</strong>.`
+  });
+
+  return steps;
+}
+
+// ==================== UI ====================
+let steps = [];
+let currentStep = 0;
+
+function renderMatrix(data, theme, shiftHighlight) {
+  let html = `<div class="matrix ${theme}">`;
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      let extra = '';
+      if (shiftHighlight && r > 0) extra = ` shifted-${r}`;
+      html += `<div class="cell${extra} highlight">${h(data[r][c])}</div>`;
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderStep(idx) {
+  const step = steps[idx];
+  const badgeStyle = `background:${step.badgeColor}22;color:${step.badgeColor};border:1px solid ${step.badgeColor}55;`;
+
+  let content = `
+    <div class="stage-header">
+      <span class="stage-badge" style="${badgeStyle}">${step.badge}</span>
+      <span class="stage-title">${step.title}</span>
+    </div>
+    <div class="stage-desc">${step.desc}</div>
+  `;
+
+  if (step.type === 'keyschedule') {
+    content += `<div class="keyschedule-grid">`;
+    step.roundKeys.forEach((rk, i) => {
+      content += `<div class="rkey-col">
+        <div class="matrix-label">RK ${i}</div>
+        <div class="matrix theme-key">`;
+      for (let r = 0; r < 4; r++)
+        for (let c = 0; c < 4; c++)
+          content += `<div class="cell">${h(rk[r][c])}</div>`;
+      content += `</div></div>`;
+    });
+    content += `</div>`;
+  } else {
+    content += `<div class="matrices-row">`;
+    step.matrices.forEach(m => {
+      if (m.symbol) {
+        content += `<div class="op-symbol">${m.symbol}</div>`;
+      } else {
+        content += `<div class="matrix-wrap">
+          <div class="matrix-label">${m.label}</div>
+          ${renderMatrix(m.data, m.theme, m.shiftHighlight)}
+        </div>`;
+      }
+    });
+    content += `</div>`;
+  }
+
+  if (step.cipherHex) {
+    content += `<div class="output-box">
+      <div class="out-label">Ciphertext (Hex)</div>
+      <div class="out-value">${step.cipherHex}</div>
+    </div>`;
+  }
+
+  content += `<div class="explanation">${step.explanation}</div>`;
+
+  document.getElementById('stage').innerHTML = content;
+
+  // Update progress dots
+  const dots = document.querySelectorAll('.step-dot');
+  dots.forEach((d, i) => {
+    d.classList.remove('active', 'done');
+    if (i === idx) d.classList.add('active');
+    else if (i < idx) d.classList.add('done');
+  });
+
+  document.getElementById('step-counter').textContent = `Langkah ${idx + 1} dari ${steps.length}`;
+  document.getElementById('btn-prev').disabled = idx === 0;
+  document.getElementById('btn-next').disabled = idx === steps.length - 1;
+}
+
+function buildProgressBar() {
+  const bar = document.getElementById('progress-bar');
+  bar.innerHTML = '';
+  steps.forEach((s, i) => {
+    if (i > 0) bar.innerHTML += `<div class="step-line"></div>`;
+    bar.innerHTML += `<div class="step-dot" onclick="jumpTo(${i})" title="${s.title}">${i + 1}</div>`;
+  });
+}
+
+function jumpTo(idx) {
+  currentStep = idx;
+  renderStep(idx);
+}
+
+function navigate(dir) {
+  currentStep = Math.max(0, Math.min(steps.length - 1, currentStep + dir));
+  renderStep(currentStep);
+  document.querySelector('.stage').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function startEncrypt() {
+  const plain = document.getElementById('inp-plain').value;
+  const key = document.getElementById('inp-key').value;
+  const err = document.getElementById('input-error');
+
+  if (plain.length !== 16 || key.length !== 16) {
+    err.textContent = '⚠ Plaintext dan Key harus tepat 16 karakter!';
+    err.style.display = 'block';
+    return;
+  }
+  err.style.display = 'none';
+
+  steps = generateSteps(plain, key);
+  currentStep = 0;
+  buildProgressBar();
+  renderStep(0);
+
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('welcome-wrap').style.display = 'none';
+}
+
+function loadExample() {
+  // Using standard AES test vector
+  document.getElementById('inp-plain').value = 'Two One Nine Two';
+  document.getElementById('inp-key').value = 'Thats my Kung Fu';
+}
+
+function resetAll() {
+  document.getElementById('progress-wrap').style.display = 'none';
+  document.getElementById('welcome-wrap').style.display = 'block';
+  steps = [];
+  currentStep = 0;
+}
+</script>
+</body>
+</html>
